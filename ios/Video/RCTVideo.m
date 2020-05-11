@@ -888,6 +888,8 @@ static int const RCTVideoUnset = -1;
       category = AVAudioSessionCategoryPlayback;
     } else if([_ignoreSilentSwitch isEqualToString:@"obey"]) {
       category = AVAudioSessionCategoryAmbient;
+    } else if([_ignoreSilentSwitch isEqualToString:@"record"]) {
+      category = AVAudioSessionCategoryPlayAndRecord;
     }
 
     if([_mixWithOthers isEqualToString:@"mix"]) {
