@@ -3,8 +3,12 @@ package com.brentvatne.react;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Matrix;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.TimedMetaData;
 import android.net.Uri;
@@ -51,7 +55,8 @@ public class ReactVideoView extends ScalableVideoView implements
     MediaPlayer.OnCompletionListener,
     MediaPlayer.OnInfoListener,
     LifecycleEventListener,
-    MediaController.MediaPlayerControl {
+    MediaController.MediaPlayerControl,
+    AudioManager.OnAudioFocusChangeListener {
 
     public enum Events {
         EVENT_LOAD_START("onVideoLoadStart"),
@@ -105,6 +110,8 @@ public class ReactVideoView extends ScalableVideoView implements
     public static final String EVENT_PROP_ERROR = "error";
     public static final String EVENT_PROP_WHAT = "what";
     public static final String EVENT_PROP_EXTRA = "extra";
+    private static final String EVENT_PROP_HAS_AUDIO_FOCUS = "hasAudioFocus";
+    private static final String EVENT_AUDIO_FOCUS_CHANGE = "onAudioFocusChanged";
 
     private ThemedReactContext mThemedReactContext;
     private RCTEventEmitter mEventEmitter;
@@ -113,6 +120,7 @@ public class ReactVideoView extends ScalableVideoView implements
     private Runnable mProgressUpdateRunnable = null;
     private Handler videoControlHandler = new Handler();
     private MediaController mediaController;
+    private final AudioManager audioManager;
 
     private String mSrcUriString = null;
     private String mSrcType = "mp4";
@@ -149,6 +157,7 @@ public class ReactVideoView extends ScalableVideoView implements
         mThemedReactContext = themedReactContext;
         mEventEmitter = themedReactContext.getJSModule(RCTEventEmitter.class);
         themedReactContext.addLifecycleEventListener(this);
+        audioManager = (AudioManager) themedReactContext.getSystemService(Context.AUDIO_SERVICE);
 
         initializeMediaPlayerIfNeeded();
         setSurfaceTextureListener(this);
@@ -400,9 +409,10 @@ public class ReactVideoView extends ScalableVideoView implements
             }
         } else {
             if (!mMediaPlayer.isPlaying()) {
+                requestAudioFocus();
                 start();
                 // Setting the rate unpauses, so we have to wait for an unpause
-                if (mRate != mActiveRate) { 
+                if (mRate != mActiveRate) {
                     setRateModifier(mRate);
                 }
 
@@ -412,6 +422,61 @@ public class ReactVideoView extends ScalableVideoView implements
         }
         setKeepScreenOn(!mPaused);
     }
+
+     private Handler mHandler = new Handler();
+        private boolean requestAudioFocus() {
+            int result;
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                result = audioManager.requestAudioFocus(this,
+                    AudioManager.STREAM_MUSIC,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+            } else { // API 26 and later
+                AudioAttributes mPlaybackAttributes = new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build();
+                AudioFocusRequest mFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                    .setAudioAttributes(mPlaybackAttributes)
+                    .setAcceptsDelayedFocusGain(true)
+                    .setOnAudioFocusChangeListener(this, mHandler)
+                    .build();
+                result = audioManager.requestAudioFocus(mFocusRequest);
+            }
+            return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+        }
+
+        @Override
+            public void onAudioFocusChange(int focusChange) {
+                switch (focusChange) {
+                    case AudioManager.AUDIOFOCUS_LOSS:
+                        audioFocusChanged(false);
+                        pause();
+                        audioManager.abandonAudioFocus(this);
+                        break;
+                    case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+                        audioFocusChanged(false);
+                        break;
+                    case AudioManager.AUDIOFOCUS_GAIN:
+                        audioFocusChanged(true);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (mMediaPlayerValid) {
+                    if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
+                        // Lower the volume
+                        if (!mMuted) {
+                            setVolume(mVolume * 0.8f, mVolume * 0.8f);
+                        }
+                    } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
+                        // Raise it back to normal
+                        if (!mMuted) {
+                            setVolume(mVolume * 1, mVolume * 1);
+                        }
+                    }
+                }
+            }
 
     // reduces the volume based on stereoPan
     private float calulateRelativeVolume() {
@@ -532,7 +597,6 @@ public class ReactVideoView extends ScalableVideoView implements
 
     @Override
     public void onPrepared(MediaPlayer mp) {
-
         mMediaPlayerValid = true;
         mVideoDuration = mp.getDuration();
 
@@ -575,6 +639,12 @@ public class ReactVideoView extends ScalableVideoView implements
         }
 
         selectTimedMetadataTrack(mp);
+    }
+
+    void audioFocusChanged(boolean hasFocus) {
+        WritableMap map = Arguments.createMap();
+        map.putBoolean(EVENT_PROP_HAS_AUDIO_FOCUS, hasFocus);
+        mEventEmitter.receiveEvent(getId(), EVENT_AUDIO_FOCUS_CHANGE, map);
     }
 
     @Override
