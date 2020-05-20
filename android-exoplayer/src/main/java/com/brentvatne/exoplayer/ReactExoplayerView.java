@@ -545,39 +545,26 @@ class ReactExoplayerView extends FrameLayout implements
         bandwidthMeter.removeEventListener(this);
     }
 
-    private boolean requestAudioFocus() {
-        if (disableFocus || srcUri == null) {
-            return true;
-        }
-        int result = audioManager.requestAudioFocus(this,
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN);
-        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
-    }
-
     private Handler mHandler = new Handler();
     private boolean requestAudioFocus() {
         if (disableFocus || srcUri == null) {
             return true;
         }
-        int result = audioManager.requestAudioFocus(this,
-            AudioManager.STREAM_MUSIC,
-            AudioManager.AUDIOFOCUS_GAIN);
-        int result = AudioManager.AUDIOFOCUS_REQUEST_FAILED;
+        int result;
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             result = audioManager.requestAudioFocus(this,
                 AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN);
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
         } else { // API 26 and later
             AudioAttributes mPlaybackAttributes = new AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build();
-            AudioFocusRequest mFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .build();
+            AudioFocusRequest mFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                 .setAudioAttributes(mPlaybackAttributes)
-                    .setAcceptsDelayedFocusGain(true)
-                    .setOnAudioFocusChangeListener(this, mHandler)
-                    .build();
+                .setAcceptsDelayedFocusGain(true)
+                .setOnAudioFocusChangeListener(this, mHandler)
+                .build();
             result = audioManager.requestAudioFocus(mFocusRequest);
         }
         return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
