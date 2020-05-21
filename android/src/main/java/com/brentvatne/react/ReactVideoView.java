@@ -141,7 +141,7 @@ public class ReactVideoView extends ScalableVideoView implements
     private boolean mPlayInBackground = false;
     private boolean mBackgroundPaused = false;
     private boolean mIsFullscreen = false;
-    private boolean mResumeOnFocusGain = false;
+    private boolean mResumeOnFocusGain = true;
 
     private int mMainVer = 0;
     private int mPatchVer = 0;
@@ -407,6 +407,7 @@ public class ReactVideoView extends ScalableVideoView implements
 
         if (mPaused) {
             if (mMediaPlayer.isPlaying()) {
+                mResumeOnFocusGain = false;
                 pause();
             }
         } else {
@@ -479,7 +480,7 @@ public class ReactVideoView extends ScalableVideoView implements
                     }
                     if (mResumeOnFocusGain) {
                         mResumeOnFocusGain = false;
-                        play();
+                        start();
                     }
                     break;
                 default:
@@ -797,6 +798,7 @@ public class ReactVideoView extends ScalableVideoView implements
              *  so that when you return to the app the video is paused
              */
             mBackgroundPaused = true;
+            mResumeOnFocusGain = false;
             mMediaPlayer.pause();
         }
     }
