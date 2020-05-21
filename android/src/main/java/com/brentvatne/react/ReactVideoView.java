@@ -72,7 +72,9 @@ public class ReactVideoView extends ScalableVideoView implements
         EVENT_FULLSCREEN_WILL_PRESENT("onVideoFullscreenPlayerWillPresent"),
         EVENT_FULLSCREEN_DID_PRESENT("onVideoFullscreenPlayerDidPresent"),
         EVENT_FULLSCREEN_WILL_DISMISS("onVideoFullscreenPlayerWillDismiss"),
-        EVENT_FULLSCREEN_DID_DISMISS("onVideoFullscreenPlayerDidDismiss");
+        EVENT_FULLSCREEN_DID_DISMISS("onVideoFullscreenPlayerDidDismiss"),
+        EVENT_AUDIO_FOCUS_CHANGE("onAudioFocusChanged");
+
 
         private final String mName;
 
@@ -106,12 +108,11 @@ public class ReactVideoView extends ScalableVideoView implements
     public static final String EVENT_PROP_TARGET = "target";
     public static final String EVENT_PROP_METADATA_IDENTIFIER = "identifier";
     public static final String EVENT_PROP_METADATA_VALUE = "value";
+    private static final String EVENT_PROP_HAS_AUDIO_FOCUS = "hasAudioFocus";
 
     public static final String EVENT_PROP_ERROR = "error";
     public static final String EVENT_PROP_WHAT = "what";
     public static final String EVENT_PROP_EXTRA = "extra";
-    private static final String EVENT_PROP_HAS_AUDIO_FOCUS = "hasAudioFocus";
-    private static final String EVENT_AUDIO_FOCUS_CHANGE = "onAudioFocusChanged";
 
     private ThemedReactContext mThemedReactContext;
     private RCTEventEmitter mEventEmitter;
@@ -121,7 +122,9 @@ public class ReactVideoView extends ScalableVideoView implements
     private Handler videoControlHandler = new Handler();
     private MediaController mediaController;
     private final AudioManager audioManager;
-    private final mAudioFocusHandler = new Handler();
+    private final Handler mAudioFocusHandler = new Handler();
+    private AudioFocusRequest mAudioFocusRequest;
+    private MediaPlayer mMediaPlayer;
 
     private String mSrcUriString = null;
     private String mSrcType = "mp4";
@@ -409,6 +412,7 @@ public class ReactVideoView extends ScalableVideoView implements
             if (mMediaPlayer.isPlaying()) {
                 mResumeOnFocusGain = false;
                 pause();
+                abandonAudioFocus();
             }
         } else {
             if (!mMediaPlayer.isPlaying()) {
@@ -437,21 +441,29 @@ public class ReactVideoView extends ScalableVideoView implements
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .build();
-            AudioFocusRequest focusRequest =
+            mAudioFocusRequest =
                     new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-                    .setAudioAttributes(mPlaybackAttributes)
+                    .setAudioAttributes(playbackAttributes)
                     .setAcceptsDelayedFocusGain(true)
                     .setOnAudioFocusChangeListener(this, mAudioFocusHandler)
                     .build();
-            result = audioManager.requestAudioFocus(focusRequest);
+            result = audioManager.requestAudioFocus(mAudioFocusRequest);
         }
         return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
     }
 
-    void audioFocusChanged(boolean hasFocus) {
+    private void audioFocusChanged(boolean hasFocus) {
         WritableMap map = Arguments.createMap();
         map.putBoolean(EVENT_PROP_HAS_AUDIO_FOCUS, hasFocus);
-        mEventEmitter.receiveEvent(getId(), EVENT_AUDIO_FOCUS_CHANGE, map);
+        mEventEmitter.receiveEvent(getId(), Events.EVENT_AUDIO_FOCUS_CHANGE.toString(), map);
+    }
+
+    private void abandonAudioFocus() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            audioManager.abandonAudioFocus(this);
+        } else {
+            audioManager.abandonAudioFocusRequest(mAudioFocusRequest);
+        }
     }
 
     @Override
@@ -476,7 +488,7 @@ public class ReactVideoView extends ScalableVideoView implements
                 case AudioManager.AUDIOFOCUS_GAIN:
                     audioFocusChanged(true);
                     if (!mMuted) {
-                        setVolume(mVolume * 1, mVolume * 1);
+                        setVolume(mVolume, mVolume);
                     }
                     if (mResumeOnFocusGain) {
                         mResumeOnFocusGain = false;
