@@ -121,6 +121,7 @@ public class ReactVideoView extends ScalableVideoView implements
     private Handler videoControlHandler = new Handler();
     private MediaController mediaController;
     private final AudioManager audioManager;
+    private final mAudioFocusHandler = new Handler();
 
     private String mSrcUriString = null;
     private String mSrcType = "mp4";
@@ -140,6 +141,7 @@ public class ReactVideoView extends ScalableVideoView implements
     private boolean mPlayInBackground = false;
     private boolean mBackgroundPaused = false;
     private boolean mIsFullscreen = false;
+    private boolean mResumeOnFocusGain = false;
 
     private int mMainVer = 0;
     private int mPatchVer = 0;
@@ -423,60 +425,68 @@ public class ReactVideoView extends ScalableVideoView implements
         setKeepScreenOn(!mPaused);
     }
 
-     private Handler mHandler = new Handler();
-        private boolean requestAudioFocus() {
-            int result;
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-                result = audioManager.requestAudioFocus(this,
+    private boolean requestAudioFocus() {
+        int result;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            result = audioManager.requestAudioFocus(this,
                     AudioManager.STREAM_MUSIC,
                     AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
-            } else { // API 26 and later
-                AudioAttributes mPlaybackAttributes = new AudioAttributes.Builder()
+        } else { // API 26 and later
+            AudioAttributes playbackAttributes = new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .build();
-                AudioFocusRequest mFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+            AudioFocusRequest focusRequest =
+                    new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                     .setAudioAttributes(mPlaybackAttributes)
                     .setAcceptsDelayedFocusGain(true)
-                    .setOnAudioFocusChangeListener(this, mHandler)
+                    .setOnAudioFocusChangeListener(this, mAudioFocusHandler)
                     .build();
-                result = audioManager.requestAudioFocus(mFocusRequest);
-            }
-            return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+            result = audioManager.requestAudioFocus(focusRequest);
         }
+        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+    }
 
-        @Override
-            public void onAudioFocusChange(int focusChange) {
-                switch (focusChange) {
-                    case AudioManager.AUDIOFOCUS_LOSS:
-                        audioFocusChanged(false);
-                        pause();
-                        audioManager.abandonAudioFocus(this);
-                        break;
-                    case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
-                        audioFocusChanged(false);
-                        break;
-                    case AudioManager.AUDIOFOCUS_GAIN:
-                        audioFocusChanged(true);
-                        break;
-                    default:
-                        break;
-                }
+    void audioFocusChanged(boolean hasFocus) {
+        WritableMap map = Arguments.createMap();
+        map.putBoolean(EVENT_PROP_HAS_AUDIO_FOCUS, hasFocus);
+        mEventEmitter.receiveEvent(getId(), EVENT_AUDIO_FOCUS_CHANGE, map);
+    }
 
-                if (mMediaPlayerValid) {
-                    if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
-                        // Lower the volume
-                        if (!mMuted) {
-                            setVolume(mVolume * 0.8f, mVolume * 0.8f);
-                        }
-                    } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
-                        // Raise it back to normal
-                        if (!mMuted) {
-                            setVolume(mVolume * 1, mVolume * 1);
-                        }
+    @Override
+    public void onAudioFocusChange(int focusChange) {
+        if(mMediaPlayerValid) {
+            switch (focusChange) {
+                case AudioManager.AUDIOFOCUS_LOSS:
+                    audioFocusChanged(false);
+                    pause();
+                    break;
+                case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+                    audioFocusChanged(false);
+                    pause();
+                    mResumeOnFocusGain = mMediaPlayer.isPlaying();
+                    break;
+                case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                    audioFocusChanged(false);
+                    if (!mMuted) {
+                        setVolume(mVolume * 0.8f, mVolume * 0.8f);
                     }
-                }
+                    break;
+                case AudioManager.AUDIOFOCUS_GAIN:
+                    audioFocusChanged(true);
+                    if (!mMuted) {
+                        setVolume(mVolume * 1, mVolume * 1);
+                    }
+                    if (mResumeOnFocusGain) {
+                        mResumeOnFocusGain = false;
+                        play();
+                    }
+                    break;
+                default:
+                    break;
             }
+        }
+    }
 
     // reduces the volume based on stereoPan
     private float calulateRelativeVolume() {
@@ -639,12 +649,6 @@ public class ReactVideoView extends ScalableVideoView implements
         }
 
         selectTimedMetadataTrack(mp);
-    }
-
-    void audioFocusChanged(boolean hasFocus) {
-        WritableMap map = Arguments.createMap();
-        map.putBoolean(EVENT_PROP_HAS_AUDIO_FOCUS, hasFocus);
-        mEventEmitter.receiveEvent(getId(), EVENT_AUDIO_FOCUS_CHANGE, map);
     }
 
     @Override
