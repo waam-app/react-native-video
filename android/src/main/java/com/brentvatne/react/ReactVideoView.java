@@ -124,7 +124,6 @@ public class ReactVideoView extends ScalableVideoView implements
     private final AudioManager audioManager;
     private final Handler mAudioFocusHandler = new Handler();
     private AudioFocusRequest mAudioFocusRequest;
-    private MediaPlayer mMediaPlayer;
 
     private String mSrcUriString = null;
     private String mSrcType = "mp4";
@@ -245,6 +244,7 @@ public class ReactVideoView extends ScalableVideoView implements
     }
 
     public void cleanupMediaPlayerResources() {
+        abandonAudioFocus();
         if ( mediaController != null ) {
             mediaController.hide();
         }
@@ -462,7 +462,9 @@ public class ReactVideoView extends ScalableVideoView implements
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             audioManager.abandonAudioFocus(this);
         } else {
-            audioManager.abandonAudioFocusRequest(mAudioFocusRequest);
+            if (mAudioFocusRequest != null) {
+                audioManager.abandonAudioFocusRequest(mAudioFocusRequest);
+            }
         }
     }
 
