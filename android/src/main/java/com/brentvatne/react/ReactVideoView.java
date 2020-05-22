@@ -142,7 +142,7 @@ public class ReactVideoView extends ScalableVideoView implements
     private boolean mBackgroundPaused = false;
     private boolean mIsFullscreen = false;
     private boolean mResumeOnFocusGain = true;
-    private boolean mAudioFocusMode;
+    private String mAudioFocusMode;
 
     private int mMainVer = 0;
     private int mPatchVer = 0;
@@ -432,10 +432,10 @@ public class ReactVideoView extends ScalableVideoView implements
     private boolean requestAudioFocus() {
         int result;
         int focusMode;
-        if (mAudioFocusMode == "duck") {
-            focusMode = AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
+        if (mAudioFocusMode.equals("duck")) {
+            focusMode = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
         } else {
-            focusMode = AUDIOFOCUS_GAIN;
+            focusMode = AudioManager.AUDIOFOCUS_GAIN;
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             result = audioManager.requestAudioFocus(this,
@@ -480,7 +480,7 @@ public class ReactVideoView extends ScalableVideoView implements
                     break;
                 case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
                     if (!mMuted) {
-                        if (mAudioFocusMode == "duck") {
+                        if (mAudioFocusMode.equals("duck")) {
                             setVolume(mVolume * 0.8f, mVolume * 0.8f);
                         } else {
                             pause();
@@ -758,7 +758,7 @@ public class ReactVideoView extends ScalableVideoView implements
             setKeepScreenOn(false);
         }
     }
-        
+
     // This is not fully tested and does not work for all forms of timed metadata
     @TargetApi(23) // 6.0
     public class TimedMetaDataAvailableListener
