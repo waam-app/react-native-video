@@ -430,7 +430,6 @@ public class ReactVideoView extends ScalableVideoView implements
     }
 
     private boolean requestAudioFocus() {
-        int result;
         int focusMode;
         if (mAudioFocusMode.equals("duck")) {
             focusMode = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
@@ -438,7 +437,7 @@ public class ReactVideoView extends ScalableVideoView implements
             focusMode = AudioManager.AUDIOFOCUS_GAIN;
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            result = audioManager.requestAudioFocus(this,
+            audioManager.requestAudioFocus(this,
                     AudioManager.STREAM_MUSIC,
                     focusMode);
         } else { // API 26 and later
@@ -449,12 +448,10 @@ public class ReactVideoView extends ScalableVideoView implements
             mAudioFocusRequest =
                     new AudioFocusRequest.Builder(focusMode)
                     .setAudioAttributes(playbackAttributes)
-                    .setAcceptsDelayedFocusGain(true)
                     .setOnAudioFocusChangeListener(this, mAudioFocusHandler)
                     .build();
-            result = audioManager.requestAudioFocus(mAudioFocusRequest);
+            audioManager.requestAudioFocus(mAudioFocusRequest);
         }
-        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
     }
 
     private void abandonAudioFocus() {
