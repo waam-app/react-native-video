@@ -72,9 +72,7 @@ public class ReactVideoView extends ScalableVideoView implements
         EVENT_FULLSCREEN_WILL_PRESENT("onVideoFullscreenPlayerWillPresent"),
         EVENT_FULLSCREEN_DID_PRESENT("onVideoFullscreenPlayerDidPresent"),
         EVENT_FULLSCREEN_WILL_DISMISS("onVideoFullscreenPlayerWillDismiss"),
-        EVENT_FULLSCREEN_DID_DISMISS("onVideoFullscreenPlayerDidDismiss"),
-        EVENT_AUDIO_FOCUS_CHANGE("onAudioFocusChanged");
-
+        EVENT_FULLSCREEN_DID_DISMISS("onVideoFullscreenPlayerDidDismiss");
 
         private final String mName;
 
@@ -144,6 +142,7 @@ public class ReactVideoView extends ScalableVideoView implements
     private boolean mBackgroundPaused = false;
     private boolean mIsFullscreen = false;
     private boolean mResumeOnFocusGain = true;
+    private boolean mAudioFocusMode;
 
     private int mMainVer = 0;
     private int mPatchVer = 0;
@@ -432,17 +431,23 @@ public class ReactVideoView extends ScalableVideoView implements
 
     private boolean requestAudioFocus() {
         int result;
+        int focusMode;
+        if (mAudioFocusMode == "duck") {
+            focusMode = AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
+        } else {
+            focusMode = AUDIOFOCUS_GAIN;
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             result = audioManager.requestAudioFocus(this,
                     AudioManager.STREAM_MUSIC,
-                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                    focusMode);
         } else { // API 26 and later
             AudioAttributes playbackAttributes = new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .build();
             mAudioFocusRequest =
-                    new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                    new AudioFocusRequest.Builder(focusMode)
                     .setAudioAttributes(playbackAttributes)
                     .setAcceptsDelayedFocusGain(true)
                     .setOnAudioFocusChangeListener(this, mAudioFocusHandler)
@@ -450,12 +455,6 @@ public class ReactVideoView extends ScalableVideoView implements
             result = audioManager.requestAudioFocus(mAudioFocusRequest);
         }
         return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
-    }
-
-    private void audioFocusChanged(boolean hasFocus) {
-        WritableMap map = Arguments.createMap();
-        map.putBoolean(EVENT_PROP_HAS_AUDIO_FOCUS, hasFocus);
-        mEventEmitter.receiveEvent(getId(), Events.EVENT_AUDIO_FOCUS_CHANGE.toString(), map);
     }
 
     private void abandonAudioFocus() {
@@ -473,22 +472,23 @@ public class ReactVideoView extends ScalableVideoView implements
         if(mMediaPlayerValid) {
             switch (focusChange) {
                 case AudioManager.AUDIOFOCUS_LOSS:
-                    audioFocusChanged(false);
                     pause();
                     break;
                 case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
-                    audioFocusChanged(false);
                     pause();
                     mResumeOnFocusGain = mMediaPlayer.isPlaying();
                     break;
                 case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
-                    audioFocusChanged(false);
                     if (!mMuted) {
-                        setVolume(mVolume * 0.8f, mVolume * 0.8f);
+                        if (mAudioFocusMode == "duck") {
+                            setVolume(mVolume * 0.8f, mVolume * 0.8f);
+                        } else {
+                            pause();
+                            mResumeOnFocusGain = mMediaPlayer.isPlaying();
+                        }
                     }
                     break;
                 case AudioManager.AUDIOFOCUS_GAIN:
-                    audioFocusChanged(true);
                     if (!mMuted) {
                         setVolume(mVolume, mVolume);
                     }
@@ -618,6 +618,10 @@ public class ReactVideoView extends ScalableVideoView implements
 
     public void setControls(boolean controls) {
         this.mUseNativeControls = controls;
+    }
+
+    public void setAudioFocusMode(String audioFocusMode) {
+        mAudioFocusMode = audioFocusMode;
     }
 
     @Override
