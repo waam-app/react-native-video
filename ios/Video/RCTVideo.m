@@ -876,11 +876,12 @@ static int const RCTVideoUnset = -1;
 
 - (void)setPaused:(BOOL)paused
 {
+  AVAudioSession *session = [AVAudioSession sharedInstance];
   if (paused) {
+    [session setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:nil];
     [_player pause];
     [_player setRate:0.0];
   } else {
-    AVAudioSession *session = [AVAudioSession sharedInstance];
     AVAudioSessionCategory category = nil;
     AVAudioSessionCategoryOptions options = nil;
 

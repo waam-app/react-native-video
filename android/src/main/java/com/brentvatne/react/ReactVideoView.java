@@ -429,7 +429,7 @@ public class ReactVideoView extends ScalableVideoView implements
         setKeepScreenOn(!mPaused);
     }
 
-    private boolean requestAudioFocus() {
+    private void requestAudioFocus() {
         int focusMode;
         if (mAudioFocusMode.equals("duck")) {
             focusMode = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
