@@ -878,9 +878,9 @@ static int const RCTVideoUnset = -1;
 {
   AVAudioSession *session = [AVAudioSession sharedInstance];
   if (paused) {
-    [session setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:nil];
     [_player pause];
     [_player setRate:0.0];
+    [session setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:nil];
   } else {
     AVAudioSessionCategory category = nil;
     AVAudioSessionCategoryOptions options = nil;
@@ -1533,6 +1533,8 @@ static int const RCTVideoUnset = -1;
 - (void)removeFromSuperview
 {
   [_player pause];
+  AVAudioSession *session = [AVAudioSession sharedInstance];
+  [session setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:nil];
   if (_playbackRateObserverRegistered) {
     [_player removeObserver:self forKeyPath:playbackRate context:nil];
     _playbackRateObserverRegistered = NO;
