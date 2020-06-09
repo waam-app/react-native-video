@@ -882,6 +882,11 @@ static int const RCTVideoUnset = -1;
     [_player setRate:0.0];
     [session setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:nil];
   } else {
+      
+    if (!_repeat) {
+      [session setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:nil];
+    }
+
     AVAudioSessionCategory category = nil;
     AVAudioSessionCategoryOptions options = nil;
 
