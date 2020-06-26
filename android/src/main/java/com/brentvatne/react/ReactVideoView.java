@@ -431,7 +431,7 @@ public class ReactVideoView extends ScalableVideoView implements
 
     private void requestAudioFocus() {
         int focusMode;
-        if (mAudioFocusMode.equals("duck")) {
+        if (mAudioFocusMode != null && mAudioFocusMode.equals("duck")) {
             focusMode = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
         } else {
             focusMode = AudioManager.AUDIOFOCUS_GAIN;
@@ -477,7 +477,7 @@ public class ReactVideoView extends ScalableVideoView implements
                     break;
                 case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
                     if (!mMuted) {
-                        if (mAudioFocusMode.equals("duck")) {
+                        if (mAudioFocusMode != null && mAudioFocusMode.equals("duck")) {
                             setVolume(mVolume * 0.8f, mVolume * 0.8f);
                         } else {
                             pause();
