@@ -433,6 +433,8 @@ public class ReactVideoView extends ScalableVideoView implements
         int focusMode;
         if (mAudioFocusMode != null && mAudioFocusMode.equals("duck")) {
             focusMode = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
+        } else if (mAudioFocusMode != null && mAudioFocusMode.equals("transient")) {
+            focusMode = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT;
         } else {
             focusMode = AudioManager.AUDIOFOCUS_GAIN;
         }

@@ -482,7 +482,7 @@ Video.propTypes = {
   playWhenInactive: PropTypes.bool,
   ignoreSilentSwitch: PropTypes.oneOf(['ignore', 'obey', 'record']),
   mixWithOthers: PropTypes.oneOf(['inherit', 'mix', 'duck']),
-  audioFocusMode: PropTypes.oneOf(['duck', 'inherit']),
+  audioFocusMode: PropTypes.oneOf(['duck', 'inherit', 'transient']),
   reportBandwidth: PropTypes.bool,
   disableFocus: PropTypes.bool,
   controls: PropTypes.bool,
