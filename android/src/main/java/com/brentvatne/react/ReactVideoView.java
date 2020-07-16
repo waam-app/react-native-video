@@ -411,11 +411,15 @@ public class ReactVideoView extends ScalableVideoView implements
             if (mMediaPlayer.isPlaying()) {
                 mResumeOnFocusGain = false;
                 pause();
-                abandonAudioFocus();
+                if (mAudioFocusMode != null) {
+                    abandonAudioFocus();
+                }
             }
         } else {
             if (!mMediaPlayer.isPlaying()) {
-                requestAudioFocus();
+                if (mAudioFocusMode != null) {
+                    requestAudioFocus();
+                }
                 start();
                 // Setting the rate unpauses, so we have to wait for an unpause
                 if (mRate != mActiveRate) {
