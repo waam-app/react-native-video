@@ -69,6 +69,7 @@ public class ReactVideoView extends ScalableVideoView implements
         EVENT_STALLED("onPlaybackStalled"),
         EVENT_RESUME("onPlaybackResume"),
         EVENT_PAUSE("onPause"),
+        EVENT_PLAY("onPlay"),
         EVENT_READY_FOR_DISPLAY("onReadyForDisplay"),
         EVENT_FULLSCREEN_WILL_PRESENT("onVideoFullscreenPlayerWillPresent"),
         EVENT_FULLSCREEN_DID_PRESENT("onVideoFullscreenPlayerDidPresent"),
@@ -198,6 +199,12 @@ public class ReactVideoView extends ScalableVideoView implements
     public void pause() {
         super.pause();
         mEventEmitter.receiveEvent(getId(), Events.EVENT_PAUSE.toString(), null);
+    }
+
+    @Override
+    public void start() {
+        super.start();
+        mEventEmitter.receiveEvent(getId(), Events.EVENT_PLAY.toString(), null);
     }
 
     @Override
