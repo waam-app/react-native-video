@@ -232,11 +232,15 @@ export default class Video extends Component {
   }
 
   _onPause = () => {
-    this.props.onPause();
+    if (this.props.onPause) {
+      this.props.onPause();
+    }
   }
 
   _onPlay = () => {
-    this.props.onPlay();
+    if (this.props.onPlay) {
+      this.props.onPlay();
+    }
   }
 
   _onAudioBecomingNoisy = () => {
