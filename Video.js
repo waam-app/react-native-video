@@ -231,6 +231,10 @@ export default class Video extends Component {
     }
   }
 
+  _onPause = () => {
+    this.props.onPause();
+  }
+
   _onAudioBecomingNoisy = () => {
     if (this.props.onAudioBecomingNoisy) {
       this.props.onAudioBecomingNoisy();
@@ -331,6 +335,7 @@ export default class Video extends Component {
       onPlaybackStalled: this._onPlaybackStalled,
       onPlaybackResume: this._onPlaybackResume,
       onPlaybackRateChange: this._onPlaybackRateChange,
+      onPause: this._onPause,
       onAudioFocusChanged: this._onAudioFocusChanged,
       onAudioBecomingNoisy: this._onAudioBecomingNoisy,
       onPictureInPictureStatusChanged: this._onPictureInPictureStatusChanged,
@@ -501,6 +506,7 @@ Video.propTypes = {
   onBandwidthUpdate: PropTypes.func,
   onSeek: PropTypes.func,
   onEnd: PropTypes.func,
+  onPause: PropTypes.func,
   onFullscreenPlayerWillPresent: PropTypes.func,
   onFullscreenPlayerDidPresent: PropTypes.func,
   onFullscreenPlayerWillDismiss: PropTypes.func,
