@@ -622,7 +622,7 @@ public class ReactVideoView extends ScalableVideoView implements
     public void applyModifiers() {
         setResizeModeModifier(mResizeMode);
         setRepeatModifier(mRepeat);
-        setPausedModifier(mPaused);
+        // setPausedModifier(mPaused);
         setMutedModifier(mMuted);
         setProgressUpdateInterval(mProgressUpdateInterval);
         setRateModifier(mRate);
