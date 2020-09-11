@@ -3,8 +3,12 @@ package com.brentvatne.react;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Matrix;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.TimedMetaData;
 import android.net.Uri;
@@ -51,7 +55,8 @@ public class ReactVideoView extends ScalableVideoView implements
     MediaPlayer.OnCompletionListener,
     MediaPlayer.OnInfoListener,
     LifecycleEventListener,
-    MediaController.MediaPlayerControl {
+    MediaController.MediaPlayerControl,
+    AudioManager.OnAudioFocusChangeListener {
 
     public enum Events {
         EVENT_LOAD_START("onVideoLoadStart"),
@@ -63,6 +68,8 @@ public class ReactVideoView extends ScalableVideoView implements
         EVENT_END("onVideoEnd"),
         EVENT_STALLED("onPlaybackStalled"),
         EVENT_RESUME("onPlaybackResume"),
+        EVENT_PAUSE("onPause"),
+        EVENT_PLAY("onPlay"),
         EVENT_READY_FOR_DISPLAY("onReadyForDisplay"),
         EVENT_FULLSCREEN_WILL_PRESENT("onVideoFullscreenPlayerWillPresent"),
         EVENT_FULLSCREEN_DID_PRESENT("onVideoFullscreenPlayerDidPresent"),
@@ -101,6 +108,7 @@ public class ReactVideoView extends ScalableVideoView implements
     public static final String EVENT_PROP_TARGET = "target";
     public static final String EVENT_PROP_METADATA_IDENTIFIER = "identifier";
     public static final String EVENT_PROP_METADATA_VALUE = "value";
+    private static final String EVENT_PROP_HAS_AUDIO_FOCUS = "hasAudioFocus";
 
     public static final String EVENT_PROP_ERROR = "error";
     public static final String EVENT_PROP_WHAT = "what";
@@ -113,6 +121,9 @@ public class ReactVideoView extends ScalableVideoView implements
     private Runnable mProgressUpdateRunnable = null;
     private Handler videoControlHandler = new Handler();
     private MediaController mediaController;
+    private final AudioManager audioManager;
+    private final Handler mAudioFocusHandler = new Handler();
+    private AudioFocusRequest mAudioFocusRequest;
 
     private String mSrcUriString = null;
     private String mSrcType = "mp4";
@@ -132,6 +143,8 @@ public class ReactVideoView extends ScalableVideoView implements
     private boolean mPlayInBackground = false;
     private boolean mBackgroundPaused = false;
     private boolean mIsFullscreen = false;
+    private boolean mResumeOnFocusGain = true;
+    private String mAudioFocusMode;
 
     private int mMainVer = 0;
     private int mPatchVer = 0;
@@ -149,6 +162,7 @@ public class ReactVideoView extends ScalableVideoView implements
         mThemedReactContext = themedReactContext;
         mEventEmitter = themedReactContext.getJSModule(RCTEventEmitter.class);
         themedReactContext.addLifecycleEventListener(this);
+        audioManager = (AudioManager) themedReactContext.getSystemService(Context.AUDIO_SERVICE);
 
         initializeMediaPlayerIfNeeded();
         setSurfaceTextureListener(this);
@@ -179,6 +193,18 @@ public class ReactVideoView extends ScalableVideoView implements
         }
 
         return super.onTouchEvent(event);
+    }
+
+    @Override
+    public void pause() {
+        super.pause();
+        mEventEmitter.receiveEvent(getId(), Events.EVENT_PAUSE.toString(), null);
+    }
+
+    @Override
+    public void start() {
+        super.start();
+        mEventEmitter.receiveEvent(getId(), Events.EVENT_PLAY.toString(), null);
     }
 
     @Override
@@ -231,6 +257,7 @@ public class ReactVideoView extends ScalableVideoView implements
     }
 
     public void cleanupMediaPlayerResources() {
+        abandonAudioFocus();
         if ( mediaController != null ) {
             mediaController.hide();
         }
@@ -396,13 +423,20 @@ public class ReactVideoView extends ScalableVideoView implements
 
         if (mPaused) {
             if (mMediaPlayer.isPlaying()) {
+                mResumeOnFocusGain = false;
                 pause();
+                if (mAudioFocusMode != null) {
+                    abandonAudioFocus();
+                }
             }
         } else {
             if (!mMediaPlayer.isPlaying()) {
+                if (mAudioFocusMode != null) {
+                    requestAudioFocus();
+                }
                 start();
                 // Setting the rate unpauses, so we have to wait for an unpause
-                if (mRate != mActiveRate) { 
+                if (mRate != mActiveRate) {
                     setRateModifier(mRate);
                 }
 
@@ -411,6 +445,79 @@ public class ReactVideoView extends ScalableVideoView implements
             }
         }
         setKeepScreenOn(!mPaused);
+    }
+
+    private void requestAudioFocus() {
+        int focusMode;
+        if (mAudioFocusMode != null && mAudioFocusMode.equals("duck")) {
+            focusMode = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
+        } else if (mAudioFocusMode != null && mAudioFocusMode.equals("transient")) {
+            focusMode = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT;
+        } else {
+            focusMode = AudioManager.AUDIOFOCUS_GAIN;
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            audioManager.requestAudioFocus(this,
+                    AudioManager.STREAM_MUSIC,
+                    focusMode);
+        } else { // API 26 and later
+            AudioAttributes playbackAttributes = new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build();
+            mAudioFocusRequest =
+                    new AudioFocusRequest.Builder(focusMode)
+                    .setAudioAttributes(playbackAttributes)
+                    .setOnAudioFocusChangeListener(this, mAudioFocusHandler)
+                    .build();
+            audioManager.requestAudioFocus(mAudioFocusRequest);
+        }
+    }
+
+    private void abandonAudioFocus() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            audioManager.abandonAudioFocus(this);
+        } else {
+            if (mAudioFocusRequest != null) {
+                audioManager.abandonAudioFocusRequest(mAudioFocusRequest);
+            }
+        }
+    }
+
+    @Override
+    public void onAudioFocusChange(int focusChange) {
+        if(mMediaPlayerValid) {
+            switch (focusChange) {
+                case AudioManager.AUDIOFOCUS_LOSS:
+                    pause();
+                    break;
+                case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+                    pause();
+                    mResumeOnFocusGain = mMediaPlayer.isPlaying();
+                    break;
+                case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                    if (!mMuted) {
+                        if (mAudioFocusMode != null && mAudioFocusMode.equals("duck")) {
+                            setVolume(mVolume * 0.8f, mVolume * 0.8f);
+                        } else {
+                            pause();
+                            mResumeOnFocusGain = mMediaPlayer.isPlaying();
+                        }
+                    }
+                    break;
+                case AudioManager.AUDIOFOCUS_GAIN:
+                    if (!mMuted) {
+                        setVolume(mVolume, mVolume);
+                    }
+                    if (mResumeOnFocusGain) {
+                        mResumeOnFocusGain = false;
+                        start();
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
     }
 
     // reduces the volume based on stereoPan
@@ -530,9 +637,12 @@ public class ReactVideoView extends ScalableVideoView implements
         this.mUseNativeControls = controls;
     }
 
+    public void setAudioFocusMode(String audioFocusMode) {
+        mAudioFocusMode = audioFocusMode;
+    }
+
     @Override
     public void onPrepared(MediaPlayer mp) {
-
         mMediaPlayerValid = true;
         mVideoDuration = mp.getDuration();
 
@@ -665,7 +775,7 @@ public class ReactVideoView extends ScalableVideoView implements
             setKeepScreenOn(false);
         }
     }
-        
+
     // This is not fully tested and does not work for all forms of timed metadata
     @TargetApi(23) // 6.0
     public class TimedMetaDataAvailableListener
@@ -723,6 +833,7 @@ public class ReactVideoView extends ScalableVideoView implements
              *  so that when you return to the app the video is paused
              */
             mBackgroundPaused = true;
+            mResumeOnFocusGain = false;
             mMediaPlayer.pause();
         }
     }
