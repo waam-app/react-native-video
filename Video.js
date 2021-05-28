@@ -203,6 +203,18 @@ export default class Video extends Component {
     }
   }
 
+  _onPause = () => {
+    if (this.props.onPause) {
+      this.props.onPause();
+    }
+  }
+
+  _onPlay = () => {
+    if (this.props.onPlay) {
+      this.props.onPlay();
+    }
+  }
+
   _onAudioBecomingNoisy = () => {
     if (this.props.onAudioBecomingNoisy) {
       this.props.onAudioBecomingNoisy();
@@ -323,6 +335,8 @@ export default class Video extends Component {
       onPlaybackStalled: this._onPlaybackStalled,
       onPlaybackResume: this._onPlaybackResume,
       onPlaybackRateChange: this._onPlaybackRateChange,
+      onPause: this._onPause,
+      onPlay: this._onPlay,
       onAudioFocusChanged: this._onAudioFocusChanged,
       onAudioBecomingNoisy: this._onAudioBecomingNoisy,
       onGetLicense: nativeProps.drm && nativeProps.drm.getLicense && this._onGetLicense,
@@ -467,7 +481,9 @@ Video.propTypes = {
   playInBackground: PropTypes.bool,
   preferredForwardBufferDuration: PropTypes.number,
   playWhenInactive: PropTypes.bool,
-  ignoreSilentSwitch: PropTypes.oneOf(['ignore', 'obey']),
+  ignoreSilentSwitch: PropTypes.oneOf(['ignore', 'obey', 'record']),
+  mixWithOthers: PropTypes.oneOf(['inherit', 'mix', 'duck']),
+  audioFocusMode: PropTypes.oneOf(['duck', 'inherit', 'transient']),
   reportBandwidth: PropTypes.bool,
   disableFocus: PropTypes.bool,
   controls: PropTypes.bool,
@@ -486,6 +502,8 @@ Video.propTypes = {
   onBandwidthUpdate: PropTypes.func,
   onSeek: PropTypes.func,
   onEnd: PropTypes.func,
+  onPause: PropTypes.func,
+  onPlay: PropTypes.func,
   onFullscreenPlayerWillPresent: PropTypes.func,
   onFullscreenPlayerDidPresent: PropTypes.func,
   onFullscreenPlayerWillDismiss: PropTypes.func,
